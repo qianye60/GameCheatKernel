@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(build.bat)",
+      "Bash(E:android-ndk-r27dndk-build.cmd NDK_PROJECT_PATH=\"C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例\" APP_BUILD_SCRIPT=\"C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例\\Android.mk\" NDK_APPLICATION_MK=\"C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例\\Application.mk\")",
+      "Bash(cmd /c \"cd /d \"\"C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例\"\" && \"\"E:\\android-ndk-r27d\\ndk-build.cmd\"\" NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk NDK_APPLICATION_MK=Application.mk\")",
+      "Bash(cmd /c:*)",
+      "Bash(powershell -Command \"Test-Path ''E:\\android-ndk-r27d\\ndk-build.cmd''\")",
+      "Bash(powershell -Command \"Set-Location 'C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例'; & 'E:\\android-ndk-r27d\\ndk-build.cmd' NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk NDK_APPLICATION_MK=Application.mk\":*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File pack_to_sh.ps1)",
+      "Bash(powershell -Command \"Set-Location ''C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例''; & ''E:\\android-ndk-r27d\\ndk-build.cmd'' NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk NDK_APPLICATION_MK=jni/Application.mk -B\")",
+      "Bash(powershell -Command:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Set-Location ''C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\简单位置读取示例''; & ''.\\pack_to_sh.ps1''\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Set-Location ''C:\\Users\\15385\\Documents\\编程项目\\AllTearGameCheatKernel\\项目基础架构''; & ''.\\pack.ps1''\")",
+      "Bash(git remote:*)",
+      "Bash(git remote rename:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

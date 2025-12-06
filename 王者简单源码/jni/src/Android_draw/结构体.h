@@ -267,6 +267,7 @@ struct HeroTemp {
     int TB3;
     int TB4;
     int confound;//坐标混淆
+    char Name[64]; // 添加名字存储
 };
 /**
  * 获取野怪xy和刷新时间

@@ -1165,6 +1165,57 @@ pid_t 获取进程ID(char* name) {
         }
         return mb.base;
     }
+
+    // 链式读取 helper
+    uintptr_t read_chain(uintptr_t base, const std::vector<uintptr_t>& offsets) {
+        uintptr_t current = base;
+        for (size_t i = 0; i < offsets.size(); ++i) {
+            if (i == offsets.size() - 1) {
+                current += offsets[i];
+                return current;
+            }
+            current = read<uintptr_t>(current + offsets[i]);
+            if (current < 0x10000) return 0; // Simple validity check
+        }
+        return current;
+    }
+
+    // 读取UTF8字符串
+    void getUTF8(char * buf, unsigned long namepy)
+    {
+        unsigned short buf16[16] = { 0 };
+        if (!read(namepy, buf16, 28)) return;
+        
+        unsigned short *pTempUTF16 = buf16;
+        char *pTempUTF8 = buf;
+        char *pTempUTF8Start = buf; // Keep start to check length
+        char *pUTF8End = pTempUTF8 + 32;
+        
+        while (pTempUTF16 < pTempUTF16 + 28)
+        {
+            if (*pTempUTF16 <= 0x007F && pTempUTF8 + 1 < pUTF8End)
+            {
+                *pTempUTF8++ = (char) * pTempUTF16;
+            }
+            else if (*pTempUTF16 >= 0x0080 && *pTempUTF16 <= 0x07FF && pTempUTF8 + 2 < pUTF8End)
+            {
+                *pTempUTF8++ = (*pTempUTF16 >> 6) | 0xC0;
+                *pTempUTF8++ = (*pTempUTF16 & 0x3F) | 0x80;
+            }
+            else if (*pTempUTF16 >= 0x0800 && *pTempUTF16 <= 0xFFFF && pTempUTF8 + 3 < pUTF8End)
+            {
+                *pTempUTF8++ = (*pTempUTF16 >> 12) | 0xE0;
+                *pTempUTF8++ = ((*pTempUTF16 >> 6) & 0x3F) | 0x80;
+                *pTempUTF8++ = (*pTempUTF16 & 0x3F) | 0x80;
+            }
+            else
+            {
+                break;
+            }
+            pTempUTF16++;
+        }
+        *pTempUTF8 = 0;
+    }
 };
 int symbol_file(const char *filename)
 {
@@ -1278,4 +1329,126 @@ long getallmo(int pid,const char* name, int index)
         fclose(p);
     }
     return start;
+}
+
+// ============================================================================
+// 新增：王者荣耀数据读取逻辑 (基于项目基础架构/main.cpp)
+// ============================================================================
+
+// 英雄数据结构
+struct HeroInfo {
+    int id;             // 英雄ID
+    int team;           // 阵营 (1=蓝方, 2=红方)
+    int hp;             // 当前血量
+    int maxHp;          // 最大血量
+    int posX;           // X坐标
+    int posY;           // Y坐标
+};
+
+// 获取 libGameCore.so 的 bss 段基址 (rw-p)
+uintptr_t GetLibGameCoreBss(int pid) {
+    char mapPath[64];
+    sprintf(mapPath, "/proc/%d/maps", pid);
+    FILE *fp = fopen(mapPath, "r");
+    uintptr_t addr = 0;
+    if (fp) {
+        char line[1024];
+        while (fgets(line, sizeof(line), fp)) {
+            // 查找 libGameCore.so 的 rw-p 段
+            if (strstr(line, "libGameCore.so") && strstr(line, "rw-p")) {
+                sscanf(line, "%lx", &addr);
+                break;
+            }
+        }
+        fclose(fp);
+    }
+    return addr;
+}
+
+// 读取指针辅助函数 (48位掩码)
+uintptr_t ReadPointer(uintptr_t addr) {
+    if (addr == 0) return 0;
+    // driver 是本文件定义的全局变量
+    uintptr_t value = driver->read<uintptr_t>(addr);
+    return value & 0xFFFFFFFFFFFF;
+}
+
+// 读取单个英雄信息
+bool ReadHeroInfo(uintptr_t heroArray, int index, HeroInfo& info) {
+    // 偏移: Array + index * 0x18
+    uintptr_t heroPtr = ReadPointer(heroArray + index * 0x18);
+    if (heroPtr == 0) return false;
+
+    // 读取ID (+0x30)
+    info.id = driver->read<int>(heroPtr + 0x30);
+
+    // 读取阵营 (+0x3C)
+    info.team = driver->read<int>(heroPtr + 0x3C);
+
+    // 读取血量 (+0x168 -> +0x98, +0xA0)
+    uintptr_t hpStructPtr = ReadPointer(heroPtr + 0x168);
+    if (hpStructPtr != 0) {
+        info.hp = driver->read<int>(hpStructPtr + 0x98);
+        info.maxHp = driver->read<int>(hpStructPtr + 0xA0);
+    }
+
+    // 读取坐标 (+0x248 -> +0x10 -> +0x0 -> +0x10 -> +0x0/0x8)
+    uintptr_t ptr1 = ReadPointer(heroPtr + 0x248);
+    if (ptr1 == 0) return false;
+
+    uintptr_t ptr2 = ReadPointer(ptr1 + 0x10);
+    if (ptr2 == 0) return false;
+
+    uintptr_t ptr3 = ReadPointer(ptr2 + 0x0);
+    if (ptr3 == 0) return false;
+
+    uintptr_t coordPtr = ReadPointer(ptr3 + 0x10);
+    if (coordPtr == 0) return false;
+
+    info.posX = driver->read<int>(coordPtr + 0x0);
+    info.posY = driver->read<int>(coordPtr + 0x8);
+
+    return true;
+}
+
+// 读取所有英雄并打印 (调试用)
+void ReadAllHeroes() {
+    if (pid == 0) {
+        printf("[-] PID未设置\n");
+        return;
+    }
+
+    uintptr_t libGameCore_bss = GetLibGameCoreBss(pid);
+    if (libGameCore_bss == 0) {
+        printf("[-] 未找到 libGameCore.so bss\n");
+        return;
+    }
+
+    // GOM: bss + 0x158918
+    uintptr_t gomPtr = ReadPointer(libGameCore_bss + 0x158918);
+    if (gomPtr == 0) {
+        printf("[-] GOM 指针为空\n");
+        return;
+    }
+
+    // HeroArray: GOM + 0x238
+    uintptr_t heroArrayPtr = gomPtr + 0x238;
+    uintptr_t heroArray = ReadPointer(heroArrayPtr);
+    if (heroArray == 0) {
+        printf("[-] HeroArray 指针为空\n");
+        return;
+    }
+
+    printf("HeroArray: %lx\n", heroArray);
+
+    for (int i = 0; i < 10; i++) {
+        HeroInfo hero = {};
+        if (ReadHeroInfo(heroArray, i, hero)) {
+            // 简单过滤无效数据
+            if (hero.id > 0) {
+                printf("Hero %d: ID=%d Team=%d HP=%d/%d Pos=(%d, %d)\n",
+                    i, hero.id, hero.team, hero.hp, hero.maxHp, hero.posX, hero.posY);
+            }
+        }
+    }
 }

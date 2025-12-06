@@ -155,9 +155,10 @@ long bingxiang8 = driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uin
        int nid= driver->read<int>(bingxiang6 + 0x30);
        //自身英雄数据获取代码段
         if (nid == 本人ID){
-                    本人X= (float)driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 + 0x248) + 0x10) + 0x0) + 0x10) + 0x0);   //y坐标0x248+0x10+0x0+0x10+0x0
-                    本人Y= (float)driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 + 0x248) + 0x10) + 0x0) + 0x10) + 0x8);   //y坐标    
-                    本人CD=driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 + 0x148) + 0x150) + 0x100) + 0xD4) / 8192000;                  //技能技能0x148) + 0x150) + 0x100) + 0xD4
+                    // 使用 read_chain 读取坐标，更加稳定
+                    本人X= (float)driver->read<int>(driver->read_chain(bingxiang6, {0x248, 0x10, 0x0, 0x10, 0x0}));
+                    本人Y= (float)driver->read<int>(driver->read_chain(bingxiang6, {0x248, 0x10, 0x0, 0x10, 0x8}));
+                    本人CD=driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 + 0x148) + 0x150) + 0x100) + 0xD4) / 8192000;
             }
         }
            
@@ -183,11 +184,28 @@ if(zhengxing==foeComp){
                     //野怪结构体  时间  id   固定坐标    实体层 第二层结构体  血量 实时坐标 野怪动一下 这个坐标变动  
         // //////头像id↓代码
                 dataTable.heroTemp[i].Id = driver->read<int>(bingxiang6 + 0x30);
-        dataTable.heroTemp[i].Hp = driver->read<int>(driver->read<uint64_t>(bingxiang6 + 0x168) + 0x98);    // 当前血量
-        dataTable.heroTemp[i].MaxHp = driver->read<int>(driver->read<uint64_t>(bingxiang6 + 0x168) + 0xA0);  //最大血量
-        dataTable.heroTemp[i].coord.X = (float) driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 +0x248) +0x10)+0x0)+0x10)+0x0);    //x坐标0x248+0x10+0x0+0x10+0x0
-		dataTable.heroTemp[i].coord.Y = (float) driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 +0x248) +0x10)+0x0)+0x10)+0x8);    //y坐标
-			//	0x150+0x108+0xF8+0x3C  英雄三技能
+                dataTable.heroTemp[i].Hp = driver->read<int>(driver->read<uint64_t>(bingxiang6 + 0x168) + 0x98);    // 当前血量
+                dataTable.heroTemp[i].MaxHp = driver->read<int>(driver->read<uint64_t>(bingxiang6 + 0x168) + 0xA0);  //最大血量
+                
+                // 使用 read_chain 读取坐标
+                dataTable.heroTemp[i].coord.X = (float) driver->read<int>(driver->read_chain(bingxiang6, {0x248, 0x10, 0x0, 0x10, 0x0}));
+          dataTable.heroTemp[i].coord.Y = (float) driver->read<int>(driver->read_chain(bingxiang6, {0x248, 0x10, 0x0, 0x10, 0x8}));
+        
+                // 读取不容易被更新的数据：英雄名字
+                // 尝试读取英雄名字，通常在 Actor -> Name 结构中
+                // 假设 0x50 是名字指针的偏移，这需要根据实际游戏版本确认
+                // 如果直接读取失败，可能需要多级指针
+                uintptr_t namePtr = driver->read<uintptr_t>(bingxiang6 + 0x50);
+                if (namePtr) {
+                    driver->getUTF8(dataTable.heroTemp[i].Name, namePtr);
+                } else {
+                     // 如果读取不到名字，使用ID查找静态名称
+                     // 这里需要引入 IsCharacter.h 中的逻辑，或者直接在这里实现简单的ID映射
+                     // 为了简化，暂时只显示ID
+                     sprintf(dataTable.heroTemp[i].Name, "ID:%d", dataTable.heroTemp[i].Id);
+                }
+        
+           //	0x150+0x108+0xF8+0x3C  英雄三技能
     人物大招最大CD = driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 + 0x150) + 0x108) + 0xF8) + 0x3C) / 8192000;                   //技能
         dataTable.heroTemp[i].HC = driver->read<int>(driver->read<uint64_t>(driver->read<uint64_t>(driver->read<uint64_t>(bingxiang6 + 0x148) + 0x168) + 0x180) + 0x20);
         //回城
@@ -274,6 +292,9 @@ map_coord.Y = map_coord.Y + SmallHPY;
 
                         }
                         ImGui::GetForegroundDrawList()->AddImage(handId != NULL ? handId : 0, { (int)pos_x - TXdx - touxiangdaxiao, (int)pos_y - TXdx - touxiangdaxiao }, { (int)pos_x + TXdx + touxiangdaxiao, (int)pos_y + TXdx + touxiangdaxiao });
+                        
+                        // 绘制名字
+                        ImGui::GetForegroundDrawList()->AddText(NULL, 18.0f, ImVec2(pos_x - 20, pos_y + 25), Paint_white, dataTable.heroTemp[i].Name);
 
 }
 
