@@ -20,7 +20,8 @@
       "Bash(git remote:*)",
       "Bash(git remote rename:*)",
       "Bash(git push:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n添加天理源码和公益内核绘制源码\n\n- 天理王者内核最新版全源 (aide打包即用)\n- 公益内核绘制自动技能\n- 公益转区脚本\n- 王者安全分析学习文档\n- IDE配置文件\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
